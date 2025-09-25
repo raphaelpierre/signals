@@ -168,10 +168,7 @@ const DashboardPage = () => {
         display: 'grid', 
         gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)', 
         gap: '2rem', 
-        marginBottom: '2rem',
-        '@media (max-width: 1024px)': {
-          gridTemplateColumns: '1fr'
-        }
+        marginBottom: '2rem'
       }}>
         {/* Left Column - Analytics & Signals */}
         <div className="animate-slideInFromLeft">
@@ -311,10 +308,7 @@ const DashboardPage = () => {
       <div className="animate-fadeIn" style={{ 
         display: 'grid', 
         gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)', 
-        gap: '2rem',
-        '@media (max-width: 1024px)': {
-          gridTemplateColumns: '1fr'
-        }
+        gap: '2rem'
       }}>
         <div className="card">
           <h3 style={{ margin: '0 0 1.5rem 0', color: '#f8fafc', fontSize: '1.4rem', display: 'flex', alignItems: 'center' }}>
