@@ -1,3 +1,4 @@
+from typing import Union
 from pydantic import BaseModel
 
 
@@ -7,6 +8,6 @@ class Token(BaseModel):
 
 
 class TokenPayload(BaseModel):
-    sub: str | None = None
-    exp: int | None = None
-    iat: int | None = None
+    sub: Union[str, None] = None
+    exp: Union[int, None] = None
+    iat: Union[int, None] = None

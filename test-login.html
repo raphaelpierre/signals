@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login Test</title>
+</head>
+<body>
+    <h1>Login Test</h1>
+    <div id="result"></div>
+    
+    <script>
+        async function testLogin() {
+            try {
+                const formData = new URLSearchParams();
+                formData.append('username', 'demo@example.com');
+                formData.append('password', 'demo123');
+                
+                console.log('Sending login request...');
+                const response = await fetch('http://localhost:8000/api/v1/auth/login', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    }
+                });
+                
+                console.log('Response status:', response.status);
+                const data = await response.json();
+                console.log('Response data:', data);
+                
+                if (response.ok) {
+                    document.getElementById('result').innerHTML = 
+                        `<div style="color: green;">✅ Login successful! Token: ${data.access_token}</div>`;
+                } else {
+                    document.getElementById('result').innerHTML = 
+                        `<div style="color: red;">❌ Login failed: ${data.detail || 'Unknown error'}</div>`;
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                document.getElementById('result').innerHTML = 
+                    `<div style="color: red;">❌ Network error: ${error.message}</div>`;
+            }
+        }
+        
+        // Test automatically when page loads
+        window.onload = testLogin;
+    </script>
+</body>
+</html>

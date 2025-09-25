@@ -19,3 +19,5 @@ class User(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     subscription = relationship("Subscription", back_populates="user", uselist=False)
+    user_signals = relationship("UserSignal", back_populates="user")
+    exchange_connections = relationship("ExchangeConnection", back_populates="user")

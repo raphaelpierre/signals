@@ -1,6 +1,8 @@
 from datetime import datetime
+from typing import Union, Optional, Dict, Any
+import json
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class SignalBase(BaseModel):
@@ -10,12 +12,42 @@ class SignalBase(BaseModel):
     entry_price: float
     target_price: float
     stop_loss: float
-    strategy: str | None = None
+    strategy: Union[str, None] = None
+    confidence: Union[float, None] = None
+    risk_reward_ratio: Union[float, None] = None
+    volume_score: Union[float, None] = None
+    technical_indicators: Union[Dict[str, Any], str, None] = None
+    market_conditions: Union[str, None] = None
+    is_active: bool = True
+    expires_at: Union[datetime, None] = None
 
 
 class SignalRead(SignalBase):
     id: int
     created_at: datetime
 
+    @field_validator('technical_indicators', mode='before')
+    @classmethod
+    def parse_technical_indicators(cls, v):
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except json.JSONDecodeError:
+                return v
+        elif isinstance(v, dict):
+            # If it's already a dict (from database JSON field), return as is
+            return v
+        return v
+
     class Config:
         from_attributes = True
+
+
+class SignalAnalytics(BaseModel):
+    total_signals: int
+    active_signals: int
+    long_signals: int
+    short_signals: int
+    avg_confidence: float
+    avg_risk_reward: float
+    top_performing_pairs: list[Dict[str, Any]]

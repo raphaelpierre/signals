@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Union
 
 from pydantic import BaseModel, EmailStr
 
@@ -18,7 +19,7 @@ class UserLogin(UserBase):
 class UserRead(UserBase):
     id: int
     is_active: bool
-    stripe_customer_id: str | None = None
+    stripe_customer_id: Union[str, None] = None
     created_at: datetime
     updated_at: datetime
 

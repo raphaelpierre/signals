@@ -1,15 +1,22 @@
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Union
+import hashlib
 
 from jose import jwt
-from passlib.context import CryptContext
 
 from .config import settings
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Temporary simple password hashing for development (replace with proper bcrypt in production)
+def simple_hash(password: str) -> str:
+    """Simple hash function for development - DO NOT use in production"""
+    return hashlib.sha256(f"{password}salt".encode()).hexdigest()
+
+def simple_verify(password: str, hashed: str) -> bool:
+    """Simple verification for development - DO NOT use in production"""
+    return simple_hash(password) == hashed
 
 
-def create_access_token(subject: str | Any, expires_delta: timedelta | None = None) -> str:
+def create_access_token(subject: Union[str, Any], expires_delta: Union[timedelta, None] = None) -> str:
     if expires_delta is None:
         expires_delta = timedelta(minutes=settings.access_token_expire_minutes)
     expire = datetime.utcnow() + expires_delta
@@ -19,8 +26,8 @@ def create_access_token(subject: str | Any, expires_delta: timedelta | None = No
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    return simple_verify(plain_password, hashed_password)
 
 
 def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
+    return simple_hash(password)

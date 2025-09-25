@@ -1,14 +1,15 @@
 from functools import lru_cache
+from typing import List, Union
 
 from pydantic import AnyHttpUrl, BaseModel, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class CorsSettings(BaseModel):
-    allow_origins: list[AnyHttpUrl] | list[str] = ["*"]
+    allow_origins: Union[List[AnyHttpUrl], List[str]] = ["*"]
     allow_credentials: bool = True
-    allow_methods: list[str] = ["*"]
-    allow_headers: list[str] = ["*"]
+    allow_methods: List[str] = ["*"]
+    allow_headers: List[str] = ["*"]
 
 
 class Settings(BaseSettings):
@@ -17,8 +18,8 @@ class Settings(BaseSettings):
     project_name: str = "Signals Backend"
     api_v1_prefix: str = "/api/v1"
 
-    database_url: str = "postgresql+psycopg2://postgres:postgres@db:5432/signals"
-    redis_url: str = "redis://redis:6379/0"
+    database_url: str = "postgresql+psycopg2://postgres:postgres@localhost:5432/signals"
+    redis_url: str = "redis://localhost:6379/0"
 
     jwt_secret_key: str = "change-me"
     jwt_algorithm: str = "HS256"
@@ -29,10 +30,16 @@ class Settings(BaseSettings):
     stripe_price_id: str = ""
 
     ccxt_exchange: str = "binance"
-    ccxt_trading_pairs: list[str] = ["BTC/USDT", "ETH/USDT"]
+    ccxt_trading_pairs: List[str] = [
+        "BTC/USDT", "ETH/USDT", "BNB/USDT", "ADA/USDT", "SOL/USDT", 
+        "MATIC/USDT", "DOT/USDT", "AVAX/USDT", "LINK/USDT", "UNI/USDT"
+    ]
+    
+    # Encryption key for API credentials (should be set in production)
+    encryption_key: str = ""
 
     cors: CorsSettings = CorsSettings()
-    cors_origins: str | None = None
+    cors_origins: Union[str, None] = None
 
     @field_validator("database_url", mode="before")
     @classmethod

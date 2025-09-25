@@ -14,9 +14,13 @@ const RegisterPage = () => {
     try {
       setError(null);
       await apiClient.post('/auth/register', { email, password });
-      await router.push('/login');
-    } catch (err) {
-      setError('Registration failed. Please try again with a different email.');
+      await router.push('/login?message=Registration successful! Please sign in.');
+    } catch (err: any) {
+      console.error('Registration error:', err);
+      const errorMessage = err.response?.data?.detail || 
+                          err.message || 
+                          'Registration failed. Please check your connection and try again.';
+      setError(errorMessage);
     }
   };
 

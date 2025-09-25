@@ -20,7 +20,14 @@ def register_user(user_in: UserCreate, db: Session = Depends(get_db)) -> User:
     user = User(email=user_in.email, hashed_password=get_password_hash(user_in.password))
     db.add(user)
     db.flush()
-    subscription = Subscription(user_id=user.id, status="incomplete")
+    # Give new users a 7-day free trial for development
+    from datetime import datetime, timedelta
+    trial_end = datetime.utcnow() + timedelta(days=7)
+    subscription = Subscription(
+        user_id=user.id, 
+        status="trialing", 
+        current_period_end=trial_end
+    )
     db.add(subscription)
     db.commit()
     db.refresh(user)

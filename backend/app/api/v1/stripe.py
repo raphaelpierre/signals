@@ -14,7 +14,7 @@ router = APIRouter(prefix="/stripe", tags=["stripe"])
 @router.post("/checkout-session", status_code=status.HTTP_201_CREATED)
 def create_checkout_session(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
-) -> dict[str, str]:
+) -> dict:
     if not settings.stripe_price_id:
         raise HTTPException(status_code=500, detail="Stripe price ID not configured")
     checkout_url = StripeService.create_checkout_session(current_user)
@@ -26,7 +26,7 @@ def create_checkout_session(
 @router.post("/portal-session")
 def create_billing_portal(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
-) -> dict[str, str]:
+) -> dict:
     if not current_user.stripe_customer_id:
         raise HTTPException(status_code=400, detail="Stripe customer not found")
     portal_url = StripeService.create_billing_portal(current_user)
@@ -36,7 +36,7 @@ def create_billing_portal(
 
 
 @router.post("/webhook")
-async def stripe_webhook(request: Request, db: Session = Depends(get_db)) -> dict[str, str]:
+async def stripe_webhook(request: Request, db: Session = Depends(get_db)) -> dict:
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature")
     if sig_header is None:

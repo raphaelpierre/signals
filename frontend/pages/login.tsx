@@ -23,8 +23,12 @@ const LoginPage = () => {
       localStorage.setItem('token', access_token);
       setAuthToken(access_token);
       await router.push('/dashboard');
-    } catch (err) {
-      setError('Unable to sign in with those credentials.');
+    } catch (err: any) {
+      console.error('Login error:', err);
+      const errorMessage = err.response?.data?.detail || 
+                          err.message || 
+                          'Unable to sign in. Please check your connection and try again.';
+      setError(errorMessage);
     }
   };
 
