@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ReactNode } from 'react';
 import MiniPriceTicker from '@/components/MiniPriceTicker';
+import Logo from '@/components/Logo';
 
 interface LayoutProps {
   children: ReactNode;
@@ -14,20 +15,7 @@ export const Layout = ({ children, token, onLogout }: LayoutProps) => {
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
           <Link href="/" style={{ textDecoration: 'none' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <div style={{ 
-                width: '2.5rem', 
-                height: '2.5rem', 
-                borderRadius: '50%', 
-                background: 'linear-gradient(135deg, #22d3ee, #0ea5e9)',
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center' 
-              }}>
-                <span style={{ fontSize: '1.2rem' }}>📈</span>
-              </div>
-              <span style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f8fafc' }}>SignalStack</span>
-            </div>
+            <Logo variant="horizontal" size="medium" clickable />
           </Link>
           {token && (
             <div style={{ display: 'flex', gap: '1rem' }}>

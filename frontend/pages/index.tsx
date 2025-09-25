@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import Layout from '@/components/Layout';
+import Logo from '@/components/Logo';
 import PerformanceShowcaseWidget from '@/components/PerformanceShowcaseWidget';
 
 const HomePage = () => {
@@ -19,7 +20,7 @@ const HomePage = () => {
       </Head>
       <div className="card" style={{ textAlign: 'center', background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%)', border: '1px solid rgba(148,163,184,0.2)' }}>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
-          <span style={{ fontSize: '4rem' }}>📈</span>
+          <Logo variant="icon" size="large" />
         </div>
         <h1 style={{ marginTop: 0, fontSize: '2.5rem', background: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
           Build confidence in your crypto trades.

@@ -1,0 +1,19 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="32" height="32" rx="6" fill="#1e293b"/>
+  
+  <!-- Chart bars -->
+  <g transform="translate(4, 12)">
+    <!-- Orange bar -->
+    <rect x="0" y="8" width="3" height="8" rx="1.5" fill="#fb923c"/>
+    <!-- Teal bar -->
+    <rect x="5" y="4" width="3" height="12" rx="1.5" fill="#2dd4bf"/>
+    <!-- Orange bar -->
+    <rect x="10" y="10" width="3" height="6" rx="1.5" fill="#fb923c"/>
+    <!-- Teal bar -->
+    <rect x="15" y="6" width="3" height="10" rx="1.5" fill="#2dd4bf"/>
+    
+    <!-- Arrow -->
+    <path d="M16 6 L20 3 L19 4 L24 4 L24 6 L19 6 L20 7 Z" fill="#2dd4bf"/>
+  </g>
+</svg>
