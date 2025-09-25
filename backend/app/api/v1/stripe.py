@@ -15,12 +15,23 @@ router = APIRouter(prefix="/stripe", tags=["stripe"])
 def create_checkout_session(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ) -> dict:
-    if not settings.stripe_price_id:
-        raise HTTPException(status_code=500, detail="Stripe price ID not configured")
-    checkout_url = StripeService.create_checkout_session(current_user)
-    db.add(current_user)
-    db.commit()
-    return {"checkout_url": checkout_url}
+    """Create a Stripe checkout session for subscription"""
+    if not StripeService.is_configured():
+        raise HTTPException(
+            status_code=503, 
+            detail="Payment processing is not available in this environment. This is a development/demo system."
+        )
+    
+    try:
+        checkout_url = StripeService.create_checkout_session(current_user)
+        db.add(current_user)
+        db.commit()
+        return {"checkout_url": checkout_url}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create checkout session: {str(e)}"
+        )
 
 
 @router.post("/portal-session")

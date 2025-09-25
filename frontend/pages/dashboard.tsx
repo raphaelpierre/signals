@@ -6,6 +6,7 @@ import Layout from '@/components/Layout';
 import EnhancedSignalTable from '@/components/EnhancedSignalTable';
 import SignalsWidget from '@/components/SignalsWidget';
 import SignalAnalytics from '@/components/SignalAnalytics';
+import DashboardStats from '@/components/DashboardStats';
 import CoinPriceWidget from '@/components/CoinPriceWidget';
 import PriceChart from '@/components/PriceChart';
 import VolumeChart from '@/components/VolumeChart';
@@ -95,34 +96,158 @@ const DashboardPage = () => {
         <title>Dashboard | SignalStack</title>
       </Head>
       
-      {/* Subscription Status */}
-      <SubscriptionStatus />
-      
-      {/* Analytics and Charts Section */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '2rem', marginBottom: '2rem' }}>
-        <div>
-          <SignalAnalytics analytics={analytics} loading={analyticsLoading} />
+      {/* Hero Section with Key Stats */}
+      <div className="animate-fadeIn" style={{ marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+          <div>
+            <h1 style={{ margin: 0, fontSize: '2.5rem', fontWeight: 700, background: 'linear-gradient(135deg, #22d3ee, #0ea5e9)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              Trading Dashboard
+            </h1>
+            <p style={{ margin: '0.5rem 0 0 0', color: '#94a3b8', fontSize: '1.1rem' }}>
+              Monitor live signals and market opportunities
+            </p>
+          </div>
+          <SubscriptionStatus />
         </div>
         
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <SignalsWidget />
-          <CoinPriceWidget />
-        </div>
+        {/* Key Performance Stats */}
+        <DashboardStats
+          totalSignals={signals.length}
+          activeSignals={analytics?.active_signals || 0}
+          successRate={analytics?.avg_confidence || 0}
+          avgConfidence={analytics?.avg_confidence || 0}
+        />
       </div>
 
-      {/* High Confidence Signals */}
+      {/* High Confidence Signals - Top Priority */}
       {highConfidenceSignals.length > 0 && (
-        <div className="card" style={{ marginBottom: '2rem', background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(15, 23, 42, 0.9) 100%)', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
-            <div style={{ background: 'linear-gradient(135deg, #10b981, #059669)', borderRadius: '50%', padding: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '2.5rem', height: '2.5rem' }}>
-              <span style={{ fontSize: '1.2rem' }}>📈</span>
+        <div className="animate-slideInFromLeft" style={{ marginBottom: '2rem' }}>
+          <div className="card" style={{ 
+            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(15, 23, 42, 0.95) 100%)', 
+            border: '2px solid rgba(16, 185, 129, 0.4)',
+            boxShadow: '0 20px 60px rgba(16, 185, 129, 0.1)' 
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+              <div style={{ 
+                background: 'linear-gradient(135deg, #10b981, #059669)', 
+                borderRadius: '50%', 
+                padding: '0.75rem', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                width: '3rem', 
+                height: '3rem',
+                boxShadow: '0 8px 20px rgba(16, 185, 129, 0.3)'
+              }}>
+                <span style={{ fontSize: '1.5rem' }}>⭐</span>
+              </div>
+              <div>
+                <h2 style={{ margin: 0, color: '#10b981', fontSize: '1.8rem', fontWeight: 700 }}>
+                  High Confidence Signals
+                </h2>
+                <p style={{ margin: '0.25rem 0 0 0', color: '#94a3b8', fontSize: '0.95rem' }}>
+                  Premium signals with confidence scores above 75%
+                </p>
+              </div>
             </div>
-            <h2 style={{ marginTop: 0, color: '#10b981', fontSize: '1.5rem' }}>⭐ High Confidence Signals (75%+)</h2>
+            <div style={{ maxHeight: '400px', overflowY: 'auto', marginTop: '1rem' }}>
+              <EnhancedSignalTable 
+                signals={highConfidenceSignals} 
+                onSignalTaken={() => {
+                  refreshSignals();
+                  loadAnalytics();
+                }} 
+              />
+            </div>
           </div>
-          <p style={{ color: '#cbd5e1' }}>Premium signals with confidence scores above 75%. These represent the strongest trading opportunities.</p>
-          <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+        </div>
+      )}
+
+      {/* Main Content Grid */}
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)', 
+        gap: '2rem', 
+        marginBottom: '2rem',
+        '@media (max-width: 1024px)': {
+          gridTemplateColumns: '1fr'
+        }
+      }}>
+        {/* Left Column - Analytics & Signals */}
+        <div className="animate-slideInFromLeft">
+          {/* Analytics Overview */}
+          <SignalAnalytics analytics={analytics} loading={analyticsLoading} />
+          
+          {/* Live Signals */}
+          <div className="card" style={{ marginTop: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ 
+                  background: 'linear-gradient(135deg, #22d3ee, #0ea5e9)', 
+                  borderRadius: '50%', 
+                  padding: '0.75rem', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  width: '3rem', 
+                  height: '3rem' 
+                }}>
+                  <span style={{ fontSize: '1.5rem' }}>📊</span>
+                </div>
+                <div>
+                  <h2 style={{ margin: 0, color: '#22d3ee', fontSize: '1.6rem' }}>Live Signals</h2>
+                  <p style={{ margin: '0.25rem 0 0 0', color: '#94a3b8', fontSize: '0.9rem' }}>
+                    Real-time algorithmic trading signals
+                  </p>
+                </div>
+              </div>
+              
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <button 
+                  className="button" 
+                  style={{ 
+                    width: 'auto', 
+                    padding: '0.5rem 1rem',
+                    fontSize: '0.875rem',
+                    background: loading ? 'rgba(148, 163, 184, 0.3)' : 'linear-gradient(135deg, #22d3ee, #0ea5e9)'
+                  }} 
+                  onClick={refreshSignals} 
+                  disabled={loading}
+                >
+                  {loading ? 'Refreshing…' : '🔄 Refresh'}
+                </button>
+                <button
+                  className="button"
+                  style={{ 
+                    width: 'auto', 
+                    padding: '0.5rem 1rem',
+                    fontSize: '0.875rem',
+                    background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)'
+                  }}
+                  onClick={triggerBackgroundJob}
+                  disabled={loading}
+                >
+                  ⚡ Generate
+                </button>
+              </div>
+            </div>
+            
+            {error && (
+              <div style={{ 
+                background: 'rgba(239, 68, 68, 0.1)', 
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                borderRadius: '8px',
+                padding: '1rem',
+                marginBottom: '1rem',
+                color: '#f87171'
+              }}>
+                {error}
+              </div>
+            )}
+            
             <EnhancedSignalTable 
-              signals={highConfidenceSignals} 
+              signals={signals} 
               onSignalTaken={() => {
                 refreshSignals();
                 loadAnalytics();
@@ -130,101 +255,84 @@ const DashboardPage = () => {
             />
           </div>
         </div>
-      )}
-
-      {/* Charts Section */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '2rem', marginBottom: '2rem' }}>
-        <div>
-          <PriceChart symbol="BTCUSDT" height={400} className="mb-4" />
-          <VolumeChart symbol="BTCUSDT" height={150} />
-        </div>
         
-        <div>
-          <PriceChart symbol="ETHUSDT" height={300} className="mb-4" />
-        </div>
-      </div>
-
-      {/* Signals Section */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '2rem', marginBottom: '2rem' }}>
-        <div className="card">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
-            <div style={{ background: 'linear-gradient(135deg, #22d3ee, #0ea5e9)', borderRadius: '50%', padding: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '2.5rem', height: '2.5rem' }}>
-              <span style={{ fontSize: '1.2rem' }}>📊</span>
-            </div>
-            <h2 style={{ marginTop: 0, color: '#22d3ee' }}>Live Signals</h2>
-          </div>
-          <p style={{ color: '#cbd5e1' }}>Monitor algorithmic entries and exits in near real-time. Data updates every hour.</p>
-          <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-            <button className="button" style={{ width: 'auto' }} onClick={refreshSignals} disabled={loading}>
-              {loading ? 'Refreshing…' : 'Refresh Signals'}
-            </button>
-            <button
-              className="button"
-              style={{ width: 'auto', background: '#22d3ee', color: '#0f172a' }}
-              onClick={triggerBackgroundJob}
-              disabled={loading}
-            >
-              Generate New Signals
-            </button>
-            <button
-              className="button"
-              style={{ width: 'auto', background: '#8b5cf6', color: '#ffffff' }}
-              onClick={loadAnalytics}
-              disabled={analyticsLoading}
-            >
-              {analyticsLoading ? 'Loading Analytics...' : 'Refresh Analytics'}
-            </button>
-            <button
-              className="button"
-              style={{ width: 'auto', background: '#10b981', color: '#ffffff' }}
-              onClick={() => router.push('/live-trading')}
-            >
-              ⚡ Live Trading
-            </button>
-          </div>
-          {error ? <p style={{ color: '#f87171' }}>{error}</p> : null}
-          <EnhancedSignalTable signals={signals} onSignalTaken={() => {
-            refreshSignals();
-            loadAnalytics();
-          }} />
+        {/* Right Column - Widgets & Quick Actions */}
+        <div className="animate-slideInFromRight" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {/* Quick Widgets */}
+          <SignalsWidget />
+          <CoinPriceWidget />
           
-          {/* Quick Live Trading Section */}
-          <div style={{
-            marginTop: '2rem',
-            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(15, 23, 42, 0.95) 100%)',
-            border: '1px solid rgba(16, 185, 129, 0.3)',
-            borderRadius: '12px',
-            padding: '1.5rem'
+          {/* Live Trading CTA */}
+          <div className="card" style={{
+            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(15, 23, 42, 0.95) 100%)',
+            border: '1px solid rgba(16, 185, 129, 0.4)',
+            textAlign: 'center'
           }}>
-            <h3 style={{ color: '#10b981', margin: '0 0 1rem 0', display: 'flex', alignItems: 'center' }}>
-              <span style={{ marginRight: '0.5rem' }}>⚡</span>
+            <div style={{ 
+              background: 'linear-gradient(135deg, #10b981, #059669)', 
+              borderRadius: '50%', 
+              padding: '1rem', 
+              display: 'inline-flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              width: '4rem', 
+              height: '4rem',
+              marginBottom: '1rem'
+            }}>
+              <span style={{ fontSize: '2rem' }}>⚡</span>
+            </div>
+            <h3 style={{ color: '#10b981', margin: '0 0 1rem 0', fontSize: '1.4rem' }}>
               Ready for Live Trading?
             </h3>
-            <p style={{ color: '#cbd5e1', marginBottom: '1rem' }}>
-              Connect your exchange accounts to execute these signals automatically with real money.
+            <p style={{ color: '#cbd5e1', marginBottom: '1.5rem', fontSize: '0.95rem' }}>
+              Connect your exchange accounts to execute signals automatically with real money.
             </p>
-            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               <button
                 className="button"
                 onClick={() => router.push('/live-trading')}
-                style={{ background: '#10b981', color: '#ffffff' }}
+                style={{ background: 'linear-gradient(135deg, #10b981, #059669)', color: '#ffffff' }}
               >
                 📊 Manage Exchanges
               </button>
               <button
                 className="button"
                 onClick={() => router.push('/live-trading')}
-                style={{ background: '#22d3ee', color: '#0f172a' }}
+                style={{ background: 'linear-gradient(135deg, #22d3ee, #0ea5e9)', color: '#0f172a' }}
               >
                 📈 View Positions
               </button>
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Charts Section */}
+      <div className="animate-fadeIn" style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)', 
+        gap: '2rem',
+        '@media (max-width: 1024px)': {
+          gridTemplateColumns: '1fr'
+        }
+      }}>
+        <div className="card">
+          <h3 style={{ margin: '0 0 1.5rem 0', color: '#f8fafc', fontSize: '1.4rem', display: 'flex', alignItems: 'center' }}>
+            <span style={{ marginRight: '0.5rem' }}>₿</span>
+            Bitcoin Analysis
+          </h3>
+          <PriceChart symbol="BTCUSDT" height={350} />
+          <div style={{ marginTop: '1rem' }}>
+            <VolumeChart symbol="BTCUSDT" height={120} />
+          </div>
+        </div>
         
-        <div>
-          {/* Additional charts for other symbols */}
-          <PriceChart symbol="ETHUSDT" height={300} className="mb-4" />
+        <div className="card">
+          <h3 style={{ margin: '0 0 1.5rem 0', color: '#f8fafc', fontSize: '1.4rem', display: 'flex', alignItems: 'center' }}>
+            <span style={{ marginRight: '0.5rem' }}>Ξ</span>
+            Ethereum Analysis
+          </h3>
+          <PriceChart symbol="ETHUSDT" height={350} />
         </div>
       </div>
     </Layout>

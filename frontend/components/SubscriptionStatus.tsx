@@ -39,6 +39,7 @@ export const SubscriptionStatus = ({ onCheckoutRedirect }: SubscriptionStatusPro
 
   const handleUpgrade = async () => {
     setCheckoutLoading(true);
+    setError(null);
     try {
       const response = await apiClient.post('/stripe/checkout-session');
       const { checkout_url } = response.data;
@@ -47,8 +48,13 @@ export const SubscriptionStatus = ({ onCheckoutRedirect }: SubscriptionStatusPro
       } else {
         window.location.href = checkout_url;
       }
-    } catch (err) {
-      setError('Failed to create checkout session. Please check your Stripe configuration.');
+    } catch (err: any) {
+      console.error('Stripe checkout error:', err);
+      if (err.response?.status === 503) {
+        setError('💳 Payment processing is not configured in this development environment. This is a demo system.');
+      } else {
+        setError('Failed to create checkout session. Please try again or contact support.');
+      }
     } finally {
       setCheckoutLoading(false);
     }
@@ -158,20 +164,30 @@ export const SubscriptionStatus = ({ onCheckoutRedirect }: SubscriptionStatusPro
         </div>
         
         {(status === 'incomplete' || status === 'trialing') && (
-          <button
-            className="button"
-            style={{ 
-              width: 'auto', 
-              background: getStatusColor(status), 
-              color: status === 'trialing' ? '#0f172a' : '#ffffff',
-              border: 'none',
-              fontWeight: 600
-            }}
-            onClick={handleUpgrade}
-            disabled={checkoutLoading}
-          >
-            {checkoutLoading ? 'Loading...' : status === 'trialing' ? 'Upgrade Now' : 'Complete Setup'}
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
+            <button
+              className="button"
+              style={{ 
+                width: 'auto', 
+                background: getStatusColor(status), 
+                color: status === 'trialing' ? '#0f172a' : '#ffffff',
+                border: 'none',
+                fontWeight: 600
+              }}
+              onClick={handleUpgrade}
+              disabled={checkoutLoading}
+            >
+              {checkoutLoading ? 'Loading...' : status === 'trialing' ? 'Upgrade Now' : 'Complete Setup'}
+            </button>
+            <p style={{ 
+              margin: 0, 
+              fontSize: '0.75rem', 
+              color: '#6b7280',
+              textAlign: 'right'
+            }}>
+              Demo environment - payments disabled
+            </p>
+          </div>
         )}
       </div>
     </div>
