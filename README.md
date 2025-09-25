@@ -27,7 +27,10 @@ Clone the repository and duplicate the environment template:
 cp .env.example .env
 ```
 
-Fill in your Stripe credentials and adjust database credentials if required.
+Fill in your Stripe credentials, adjust database credentials if required, and set
+`FRONTEND_BASE_URL` to the URL where the Next.js app is reachable (defaults to
+`http://localhost:3000`). The backend uses this value to build Stripe checkout,
+cancel, and billing portal redirects.
 
 ### Launch the stack
 

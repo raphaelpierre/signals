@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     stripe_webhook_secret: str = ""
     stripe_price_id: str = ""
 
+    frontend_base_url: str = "http://localhost:3000"
+
     ccxt_exchange: str = "binance"
     ccxt_trading_pairs: list[str] = ["BTC/USDT", "ETH/USDT"]
 
@@ -38,6 +40,13 @@ class Settings(BaseSettings):
     @classmethod
     def ensure_async_url(cls, value: str) -> str:
         return value.replace("postgres://", "postgresql://")
+
+    @field_validator("frontend_base_url", mode="before")
+    @classmethod
+    def strip_trailing_slash(cls, value: str) -> str:
+        if value.endswith("/"):
+            return value.rstrip("/")
+        return value
 
     @model_validator(mode="after")
     def split_cors_origins(self) -> "Settings":

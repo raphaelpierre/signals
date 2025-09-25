@@ -24,12 +24,16 @@ class StripeService:
     @staticmethod
     def create_checkout_session(user: User) -> str:
         customer_id = StripeService.ensure_customer(user)
+        success_url = (
+            f"{settings.frontend_base_url}/dashboard?session_id={{CHECKOUT_SESSION_ID}}"
+        )
+        cancel_url = f"{settings.frontend_base_url}/pricing"
         session = stripe.checkout.Session.create(
             customer=customer_id,
             mode="subscription",
             line_items=[{"price": settings.stripe_price_id, "quantity": 1}],
-            success_url="https://example.com/dashboard?session_id={CHECKOUT_SESSION_ID}",
-            cancel_url="https://example.com/pricing",
+            success_url=success_url,
+            cancel_url=cancel_url,
             automatic_tax={"enabled": True},
         )
         return session["url"]
@@ -40,7 +44,7 @@ class StripeService:
             raise ValueError("User is not a Stripe customer")
         portal_session = stripe.billing_portal.Session.create(
             customer=user.stripe_customer_id,
-            return_url="https://example.com/dashboard",
+            return_url=f"{settings.frontend_base_url}/dashboard",
         )
         return portal_session["url"]
 
