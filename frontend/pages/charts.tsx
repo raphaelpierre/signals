@@ -34,9 +34,17 @@ const ChartsPage = () => {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    setAuthToken(null);
-    router.push('/');
+    console.log('Logout function called from charts');
+    try {
+      localStorage.removeItem('token');
+      setAuthToken(null);
+      setToken(null);
+      console.log('Token cleared, redirecting to home');
+      router.push('/');
+    } catch (error) {
+      console.error('Error during logout:', error);
+      router.push('/');
+    }
   };
 
   return (

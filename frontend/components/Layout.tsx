@@ -40,7 +40,24 @@ export const Layout = ({ children, token, onLogout }: LayoutProps) => {
               <Link href="/live-trading" style={{ color: '#22d3ee', textDecoration: 'none' }}>⚡ Live Trading</Link>
               <Link href="/charts">Charts</Link>
               <Link href="/my-signals">My Signals</Link>
-              <button className="button" style={{ width: 'auto', padding: '0.5rem 1rem' }} onClick={onLogout}>
+              <button 
+                className="button" 
+                style={{ 
+                  width: 'auto', 
+                  padding: '0.5rem 1rem',
+                  cursor: 'pointer',
+                  zIndex: 10,
+                  position: 'relative'
+                }} 
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log('Logout button clicked');
+                  if (onLogout) {
+                    onLogout();
+                  }
+                }}
+              >
                 Logout
               </button>
             </>
