@@ -26,11 +26,23 @@ export interface Signal {
   target_price: number;
   stop_loss: number;
   strategy?: string;
+  strategy_id?: string;
   confidence?: number;
+  quality_score?: number;
   risk_reward_ratio?: number;
   volume_score?: number;
   technical_indicators?: any;
+  rationale?: string[];
+  regime?: {
+    trend?: string;
+    vol?: string;
+    liq?: string;
+  };
   market_conditions?: string;
+  latency_ms?: number;
+  bt_winrate?: number;
+  bt_pf?: number;
+  risk_pct?: number;
   is_active?: boolean;
   expires_at?: string;
   created_at: string;

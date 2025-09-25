@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { Signal, takeSignal, TakeSignalData } from '@/lib/api';
+import EnhancedSignalCard from '@/components/EnhancedSignalCard';
+import LiveTrading from '@/components/LiveTrading';
 
 interface EnhancedSignalTableProps {
   signals: Signal[];
   onSignalTaken?: () => void;
+  showLiveTrading?: boolean;
 }
 
 interface TakeSignalModalProps {
@@ -171,15 +174,21 @@ const TakeSignalModal: React.FC<TakeSignalModalProps> = ({
 
 export const EnhancedSignalTable: React.FC<EnhancedSignalTableProps> = ({ 
   signals, 
-  onSignalTaken 
+  onSignalTaken,
+  showLiveTrading = false 
 }) => {
   const [selectedSignal, setSelectedSignal] = useState<Signal | null>(null);
+  const [expandedSignal, setExpandedSignal] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleTakeSignal = (signal: Signal) => {
     setSelectedSignal(signal);
     setError(null);
+  };
+
+  const handleTrade = (signal: Signal) => {
+    setExpandedSignal(expandedSignal === signal.id ? null : signal.id);
   };
 
   const handleSubmitTakeSignal = async (data: TakeSignalData) => {
@@ -203,26 +212,10 @@ export const EnhancedSignalTable: React.FC<EnhancedSignalTableProps> = ({
     }
   };
 
-  const formatPrice = (price: number) => {
-    return price >= 1000 ? price.toFixed(2) : price.toFixed(4);
-  };
-
-  const getConfidenceColor = (confidence: number | undefined) => {
-    if (!confidence) return '#94a3b8';
-    if (confidence >= 80) return '#10b981';
-    if (confidence >= 70) return '#f59e0b';
-    return '#ef4444';
-  };
-
-  const getRiskRewardColor = (ratio: number | undefined) => {
-    if (!ratio) return '#94a3b8';
-    if (ratio >= 2) return '#10b981';
-    if (ratio >= 1.5) return '#f59e0b';
-    return '#ef4444';
-  };
-
   if (!signals.length) {
-    return <p>No signals available yet. Trigger a refresh to generate new signals.</p>;
+    return <p style={{ color: '#94a3b8', textAlign: 'center', padding: '2rem' }}>
+      No signals available yet. Trigger a refresh to generate new signals.
+    </p>;
   }
 
   return (
@@ -240,6 +233,42 @@ export const EnhancedSignalTable: React.FC<EnhancedSignalTableProps> = ({
         </div>
       )}
 
+      {/* Enhanced Signal Cards View */}
+      <div style={{ marginBottom: '2rem' }}>
+        <div className="desktop-view">
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', 
+            gap: '1.5rem' 
+          }}>
+            {signals.map((signal) => (
+              <div key={`card-${signal.id}`}>
+                <EnhancedSignalCard 
+                  signal={signal} 
+                  showTrade={showLiveTrading}
+                  onTrade={handleTrade}
+                />
+                
+                {/* Expanded Live Trading for this signal */}
+                {showLiveTrading && expandedSignal === signal.id && (
+                  <div style={{ 
+                    marginTop: '1rem',
+                    borderRadius: '12px',
+                    overflow: 'hidden'
+                  }}>
+                    <LiveTrading 
+                      signal={signal} 
+                      onTradePlaced={() => setExpandedSignal(null)} 
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Legacy Table View (togglable in future UI) */}
       <div style={{ overflowX: 'auto' }}>
         <table className="table">
           <thead>
@@ -249,8 +278,8 @@ export const EnhancedSignalTable: React.FC<EnhancedSignalTableProps> = ({
               <th>Entry</th>
               <th>Target</th>
               <th>Stop Loss</th>
+              <th>Quality</th>
               <th>R/R</th>
-              <th>Confidence</th>
               <th>Generated</th>
               <th>Action</th>
             </tr>
@@ -265,20 +294,28 @@ export const EnhancedSignalTable: React.FC<EnhancedSignalTableProps> = ({
                 }}>
                   {signal.direction}
                 </td>
-                <td>${formatPrice(signal.entry_price)}</td>
-                <td>${formatPrice(signal.target_price)}</td>
-                <td>${formatPrice(signal.stop_loss)}</td>
-                <td style={{ 
-                  color: getRiskRewardColor(signal.risk_reward_ratio),
-                  fontWeight: 500 
-                }}>
-                  {signal.risk_reward_ratio ? signal.risk_reward_ratio.toFixed(2) : 'N/A'}
+                <td>${signal.entry_price.toFixed(signal.entry_price < 10 ? 6 : 2)}</td>
+                <td>${signal.target_price.toFixed(signal.target_price < 10 ? 6 : 2)}</td>
+                <td>${signal.stop_loss.toFixed(signal.stop_loss < 10 ? 6 : 2)}</td>
+                <td>
+                  <span style={{
+                    display: 'inline-block',
+                    padding: '0.15rem 0.5rem',
+                    borderRadius: '9999px',
+                    fontSize: '0.75rem',
+                    fontWeight: 500,
+                    color: 'white',
+                    backgroundColor: (signal.quality_score || (signal.confidence || 0) * 1) >= 80 ? 
+                      '#16a34a' : 
+                      (signal.quality_score || (signal.confidence || 0) * 1) >= 60 ? 
+                        '#65a30d' : 
+                        '#f59e0b'
+                  }}>
+                    {Math.round(signal.quality_score || (signal.confidence || 0) * 1)}
+                  </span>
                 </td>
-                <td style={{ 
-                  color: getConfidenceColor(signal.confidence),
-                  fontWeight: 500 
-                }}>
-                  {signal.confidence ? `${signal.confidence.toFixed(0)}%` : 'N/A'}
+                <td>
+                  {signal.risk_reward_ratio ? `${signal.risk_reward_ratio.toFixed(1)}:1` : 'N/A'}
                 </td>
                 <td style={{ fontSize: '0.875rem', color: '#4b5563' }}>
                   {new Date(signal.created_at).toLocaleString()}
