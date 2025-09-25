@@ -288,3 +288,203 @@ export const fetchTradingPositions = async (): Promise<TradingPosition[]> => {
   const response = await apiClient.get<TradingPosition[]>('/exchanges/positions');
   return response.data;
 };
+
+// Auto Trading Types
+export interface AutoTradingConfig {
+  id: number;
+  user_id: number;
+  exchange_connection_id: number;
+  is_enabled: boolean;
+  trading_mode: string;
+  max_position_size_percent: number;
+  max_daily_trades: number;
+  max_open_positions: number;
+  stop_loss_enabled: boolean;
+  take_profit_enabled: boolean;
+  min_confidence_score: number;
+  allowed_symbols?: string[];
+  blocked_symbols?: string[];
+  allowed_strategies?: string[];
+  follow_portfolio_allocation: boolean;
+  rebalance_frequency: string;
+  target_allocations?: Record<string, number>;
+  created_at: string;
+  updated_at: string;
+  last_trade_at?: string;
+}
+
+export interface AutoTradingConfigCreate {
+  exchange_connection_id: number;
+  is_enabled?: boolean;
+  trading_mode?: string;
+  max_position_size_percent?: number;
+  max_daily_trades?: number;
+  max_open_positions?: number;
+  stop_loss_enabled?: boolean;
+  take_profit_enabled?: boolean;
+  min_confidence_score?: number;
+  allowed_symbols?: string[];
+  blocked_symbols?: string[];
+  allowed_strategies?: string[];
+  follow_portfolio_allocation?: boolean;
+  rebalance_frequency?: string;
+  target_allocations?: Record<string, number>;
+}
+
+export interface AutoTrade {
+  id: number;
+  config_id: number;
+  signal_id: number;
+  trading_position_id?: number;
+  symbol: string;
+  action: string;
+  trigger_reason: string;
+  executed: boolean;
+  execution_price?: string;
+  quantity: string;
+  error_message?: string;
+  created_at: string;
+  executed_at?: string;
+}
+
+export interface PortfolioAllocation {
+  id: number;
+  user_id: number;
+  symbol: string;
+  target_percentage: number;
+  current_percentage?: number;
+  min_investment_amount: number;
+  auto_rebalance: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  last_rebalanced_at?: string;
+}
+
+export interface PortfolioAllocationCreate {
+  symbol: string;
+  target_percentage: number;
+  min_investment_amount?: number;
+  auto_rebalance?: boolean;
+}
+
+export interface CryptoWatchlist {
+  id: number;
+  user_id: number;
+  symbol: string;
+  priority: number;
+  auto_trade_enabled: boolean;
+  price_alerts_enabled: boolean;
+  price_alert_above?: number;
+  price_alert_below?: number;
+  volume_alert_enabled: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CryptoWatchlistCreate {
+  symbol: string;
+  priority?: number;
+  auto_trade_enabled?: boolean;
+  price_alerts_enabled?: boolean;
+  price_alert_above?: number;
+  price_alert_below?: number;
+  volume_alert_enabled?: boolean;
+}
+
+export interface PortfolioAnalytics {
+  total_value_usd: number;
+  total_allocated_percentage: number;
+  unallocated_percentage: number;
+  rebalance_needed: boolean;
+  next_rebalance_date?: string;
+  allocations: PortfolioAllocation[];
+  performance_24h: number;
+  performance_7d: number;
+  performance_30d: number;
+}
+
+export interface InvestmentRecommendation {
+  symbol: string;
+  action: string;
+  recommended_percentage: number;
+  current_percentage: number;
+  reason: string;
+  confidence: number;
+  risk_level: string;
+}
+
+// Auto Trading API Functions
+export const createAutoTradingConfig = async (data: AutoTradingConfigCreate): Promise<AutoTradingConfig> => {
+  const response = await apiClient.post<AutoTradingConfig>('/auto-trading/config', data);
+  return response.data;
+};
+
+export const fetchAutoTradingConfigs = async (): Promise<AutoTradingConfig[]> => {
+  const response = await apiClient.get<AutoTradingConfig[]>('/auto-trading/config');
+  return response.data;
+};
+
+export const updateAutoTradingConfig = async (configId: number, data: Partial<AutoTradingConfig>): Promise<AutoTradingConfig> => {
+  const response = await apiClient.put<AutoTradingConfig>(`/auto-trading/config/${configId}`, data);
+  return response.data;
+};
+
+export const deleteAutoTradingConfig = async (configId: number): Promise<void> => {
+  await apiClient.delete(`/auto-trading/config/${configId}`);
+};
+
+export const fetchAutoTrades = async (configId?: number): Promise<AutoTrade[]> => {
+  const params = configId ? { config_id: configId } : {};
+  const response = await apiClient.get<AutoTrade[]>('/auto-trading/trades', { params });
+  return response.data;
+};
+
+export const createPortfolioAllocation = async (data: PortfolioAllocationCreate): Promise<PortfolioAllocation> => {
+  const response = await apiClient.post<PortfolioAllocation>('/auto-trading/portfolio', data);
+  return response.data;
+};
+
+export const fetchPortfolioAllocations = async (): Promise<PortfolioAllocation[]> => {
+  const response = await apiClient.get<PortfolioAllocation[]>('/auto-trading/portfolio');
+  return response.data;
+};
+
+export const updatePortfolioAllocation = async (allocationId: number, data: Partial<PortfolioAllocation>): Promise<PortfolioAllocation> => {
+  const response = await apiClient.put<PortfolioAllocation>(`/auto-trading/portfolio/${allocationId}`, data);
+  return response.data;
+};
+
+export const deletePortfolioAllocation = async (allocationId: number): Promise<void> => {
+  await apiClient.delete(`/auto-trading/portfolio/${allocationId}`);
+};
+
+export const fetchPortfolioAnalytics = async (): Promise<PortfolioAnalytics> => {
+  const response = await apiClient.get<PortfolioAnalytics>('/auto-trading/portfolio/analytics');
+  return response.data;
+};
+
+export const addToWatchlist = async (data: CryptoWatchlistCreate): Promise<CryptoWatchlist> => {
+  const response = await apiClient.post<CryptoWatchlist>('/auto-trading/watchlist', data);
+  return response.data;
+};
+
+export const fetchWatchlist = async (): Promise<CryptoWatchlist[]> => {
+  const response = await apiClient.get<CryptoWatchlist[]>('/auto-trading/watchlist');
+  return response.data;
+};
+
+export const updateWatchlistItem = async (itemId: number, data: Partial<CryptoWatchlist>): Promise<CryptoWatchlist> => {
+  const response = await apiClient.put<CryptoWatchlist>(`/auto-trading/watchlist/${itemId}`, data);
+  return response.data;
+};
+
+export const removeFromWatchlist = async (itemId: number): Promise<void> => {
+  await apiClient.delete(`/auto-trading/watchlist/${itemId}`);
+};
+
+export const fetchInvestmentRecommendations = async (): Promise<InvestmentRecommendation[]> => {
+  const response = await apiClient.get<InvestmentRecommendation[]>('/auto-trading/recommendations');
+  return response.data;
+};
