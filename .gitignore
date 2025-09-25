@@ -1,0 +1,36 @@
+# Node
+node_modules/
+.next/
+.yarn/
+yarn.lock
+npm-debug.log*
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv
+.env.local
+
+# Environment
+.env*
+!.env.example
+
+# Editor
+.vscode/
+.idea/
+.DS_Store
+
+# Python build
+*.egg-info/
+.eggs/
+
+# Redis dumps
+*.rdb
+
+# Docker artifacts
+volumes/
+
