@@ -1,7 +1,7 @@
 from typing import List
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func, desc
+from sqlalchemy import func, desc, or_
 from datetime import datetime, timedelta
 
 from app.api.deps import ensure_active_subscription, get_current_user
@@ -12,6 +12,23 @@ from app.schemas.signal import SignalRead, SignalAnalytics
 from app.workers.tasks import enqueue_signal_job
 
 router = APIRouter(prefix="/signals", tags=["signals"])
+
+
+def _deactivate_expired_signals(db: Session) -> None:
+    """Mark signals as inactive once their expiration has passed."""
+    now = datetime.utcnow()
+    expired = (
+        db.query(Signal)
+        .filter(
+            Signal.is_active == True,  # noqa: E712 - SQLAlchemy comparison
+            Signal.expires_at.isnot(None),
+            Signal.expires_at <= now,
+        )
+        .update({Signal.is_active: False}, synchronize_session=False)
+    )
+
+    if expired:
+        db.commit()
 
 
 @router.get("/historic", response_model=List[SignalRead])
@@ -168,8 +185,13 @@ def get_latest_signals(
     current_user: User = Depends(get_current_user),
 ) -> List[Signal]:
     ensure_active_subscription(current_user)
-    
+
+    _deactivate_expired_signals(db)
+
+    now = datetime.utcnow()
+
     query = db.query(Signal).filter(Signal.is_active == True)
+    query = query.filter(or_(Signal.expires_at.is_(None), Signal.expires_at > now))
     
     if symbol:
         query = query.filter(Signal.symbol == symbol.upper())
@@ -191,6 +213,8 @@ def get_signals_for_pairs(
     current_user: User = Depends(get_current_user),
 ) -> List[Signal]:
     ensure_active_subscription(current_user)
+    _deactivate_expired_signals(db)
+    now = datetime.utcnow()
     tickers = {symbol.strip().upper() for symbol in symbols.split(",") if symbol.strip()}
     if not tickers:
         return []
@@ -198,6 +222,7 @@ def get_signals_for_pairs(
         db.query(Signal)
         .filter(Signal.symbol.in_(tickers))
         .filter(Signal.is_active == True)
+        .filter(or_(Signal.expires_at.is_(None), Signal.expires_at > now))
         .order_by(Signal.created_at.desc())
         .limit(100)
         .all()
@@ -212,16 +237,19 @@ def get_signal_analytics(
     current_user: User = Depends(get_current_user),
 ) -> SignalAnalytics:
     ensure_active_subscription(current_user)
-    
+
+    _deactivate_expired_signals(db)
+    now = datetime.utcnow()
     cutoff_date = datetime.utcnow() - timedelta(days=days)
-    
+
     # Basic counts
     total_signals = db.query(Signal).filter(Signal.created_at >= cutoff_date).count()
     active_signals = db.query(Signal).filter(
         Signal.created_at >= cutoff_date,
-        Signal.is_active == True
+        Signal.is_active == True,
+        or_(Signal.expires_at.is_(None), Signal.expires_at > now)
     ).count()
-    
+
     # Direction counts
     long_signals = db.query(Signal).filter(
         Signal.created_at >= cutoff_date,
@@ -281,10 +309,14 @@ def get_high_confidence_signals(
     current_user: User = Depends(get_current_user),
 ) -> List[Signal]:
     ensure_active_subscription(current_user)
-    
+
+    _deactivate_expired_signals(db)
+    now = datetime.utcnow()
+
     signals = (
         db.query(Signal)
         .filter(Signal.is_active == True)
+        .filter(or_(Signal.expires_at.is_(None), Signal.expires_at > now))
         .filter(Signal.confidence >= min_confidence)
         .order_by(Signal.confidence.desc())
         .limit(limit)
