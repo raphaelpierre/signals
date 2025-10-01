@@ -4,8 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
 
-from app.api.deps import get_current_user, get_db
-from app.core.security import ensure_active_subscription
+from app.api.deps import ensure_active_subscription, get_current_user, get_db
 from app.models.user import User
 from app.models.auto_trading import AutoTradingConfig, AutoTrade, PortfolioAllocation, CryptoWatchlist
 from app.models.exchange import ExchangeConnection
