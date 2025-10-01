@@ -1,17 +1,96 @@
 from typing import List
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
-from sqlalchemy import func, desc, or_
+import logging
 from datetime import datetime, timedelta
+from functools import lru_cache
+from typing import Dict, Iterable, List, Optional, Sequence
+
+import ccxt
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy import desc, func, or_
+from sqlalchemy.orm import Session
 
 from app.api.deps import ensure_active_subscription, get_current_user
+from app.core.config import settings
 from app.db.session import get_db
 from app.models.signal import Signal
 from app.models.user import User
-from app.schemas.signal import SignalRead, SignalAnalytics
+from app.schemas.signal import SignalAnalytics, SignalRead
 from app.workers.tasks import enqueue_signal_job
 
+logger = logging.getLogger(__name__)
+
+
 router = APIRouter(prefix="/signals", tags=["signals"])
+
+
+@lru_cache(maxsize=1)
+def _exchange() -> ccxt.Exchange:
+    exchange_class = getattr(ccxt, settings.ccxt_exchange)
+    exchange: ccxt.Exchange = exchange_class({"enableRateLimit": True})
+    try:
+        exchange.load_markets()
+    except Exception as exc:  # pragma: no cover - external API failures
+        logger.warning("Failed to pre-load markets: %s", exc)
+    return exchange
+
+
+def _fetch_live_market_data(symbols: Iterable[str]) -> Dict[str, Dict[str, Optional[float]]]:
+    unique_symbols = sorted({symbol for symbol in symbols if symbol})
+    if not unique_symbols:
+        return {}
+
+    exchange = _exchange()
+
+    try:
+        tickers = exchange.fetch_tickers(unique_symbols)
+    except Exception as exc:  # pragma: no cover - external API failures
+        logger.warning("Bulk ticker fetch failed: %s", exc)
+        tickers = {}
+
+    market_data: Dict[str, Dict[str, Optional[float]]] = {}
+
+    for symbol in unique_symbols:
+        ticker = tickers.get(symbol)
+        if ticker is None:
+            try:
+                ticker = exchange.fetch_ticker(symbol)
+            except Exception as exc:  # pragma: no cover - external API failures
+                logger.warning("Failed to fetch ticker for %s: %s", symbol, exc)
+                continue
+
+        last_price = ticker.get("last") or ticker.get("close")
+        if last_price is None:
+            continue
+
+        market_data[symbol] = {
+            "price": float(last_price),
+            "percentage": float(ticker.get("percentage")) if ticker.get("percentage") is not None else None,
+        }
+
+    return market_data
+
+
+def _attach_live_market_data(signals: Sequence[Signal]) -> List[SignalRead]:
+    if not signals:
+        return []
+
+    market_data = _fetch_live_market_data(signal.symbol for signal in signals)
+    fetched_at = datetime.utcnow()
+
+    enriched: List[SignalRead] = []
+    for signal in signals:
+        signal_schema = SignalRead.model_validate(signal)
+        if market_data:
+            data = market_data.get(signal.symbol)
+            if data:
+                signal_schema = signal_schema.model_copy(update={
+                    "current_price": data.get("price"),
+                    "price_change_percent": data.get("percentage"),
+                    "price_last_updated": fetched_at,
+                })
+        enriched.append(signal_schema)
+
+    return enriched
 
 
 def _deactivate_expired_signals(db: Session) -> None:
@@ -54,7 +133,7 @@ def get_historic_signals(
     
     # Order by confidence descending to show best signals first
     signals = query.order_by(Signal.confidence.desc(), Signal.created_at.desc()).limit(limit).all()
-    return signals
+    return _attach_live_market_data(signals)
 
 
 @router.get("/demo", response_model=List[SignalRead])
@@ -76,8 +155,8 @@ def get_demo_signals(
     ).order_by(
         Signal.confidence.desc()
     ).limit(10).all()
-    
-    return signals
+
+    return _attach_live_market_data(signals)
 
 
 @router.get("/performance-showcase", response_model=dict)
@@ -203,7 +282,7 @@ def get_latest_signals(
         query = query.filter(Signal.confidence >= min_confidence)
     
     signals = query.order_by(Signal.created_at.desc()).limit(limit).all()
-    return signals
+    return _attach_live_market_data(signals)
 
 
 @router.get("/watchlist", response_model=List[SignalRead])
@@ -227,7 +306,7 @@ def get_signals_for_pairs(
         .limit(100)
         .all()
     )
-    return signals
+    return _attach_live_market_data(signals)
 
 
 @router.get("/analytics", response_model=SignalAnalytics)
@@ -322,7 +401,7 @@ def get_high_confidence_signals(
         .limit(limit)
         .all()
     )
-    return signals
+    return _attach_live_market_data(signals)
 
 
 @router.post("/refresh")

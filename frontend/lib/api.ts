@@ -46,6 +46,9 @@ export interface Signal {
   is_active?: boolean;
   expires_at?: string;
   created_at: string;
+  current_price?: number;
+  price_change_percent?: number;
+  price_last_updated?: string;
 }
 
 export interface SignalAnalytics {

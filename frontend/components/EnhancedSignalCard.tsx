@@ -105,9 +105,20 @@ interface SignalCardProps {
 
 export default function EnhancedSignalCard({ signal, showTrade = false, onTrade }: SignalCardProps) {
   const [showTooltip, setShowTooltip] = useState(false);
-  
+
   // Shorthand access
   const s = signal;
+  const formatPrice = (price: number) => {
+    if (price >= 10) return price.toFixed(2);
+    if (price >= 1) return price.toFixed(4);
+    return price.toFixed(6);
+  };
+  const livePrice = s.current_price ?? s.entry_price;
+  const priceDelta = s.current_price
+    ? ((s.current_price - s.entry_price) / s.entry_price) * 100
+    : null;
+  const priceDeltaFormatted = priceDelta !== null ? `${priceDelta >= 0 ? '+' : ''}${priceDelta.toFixed(2)}%` : null;
+  const priceLastUpdated = s.price_last_updated ? new Date(s.price_last_updated) : null;
   
   // Format timestamp to show how long ago the signal was created
   const timeSince = (date: string) => {
@@ -157,10 +168,27 @@ export default function EnhancedSignalCard({ signal, showTrade = false, onTrade 
       </div>
       
       <div className="text-sm text-gray-300">
-        Entry <b className="text-white">${s.entry_price.toFixed(2)}</b>
-        {s.stop_loss && <> · SL <b className="text-red-400">${s.stop_loss.toFixed(2)}</b></>}
-        {s.target_price && <> · TP <b className="text-green-400">${s.target_price.toFixed(2)}</b></>}
+        Entry <b className="text-white">${formatPrice(s.entry_price)}</b>
+        {s.stop_loss && <> · SL <b className="text-red-400">${formatPrice(s.stop_loss)}</b></>}
+        {s.target_price && <> · TP <b className="text-green-400">${formatPrice(s.target_price)}</b></>}
         <> · Risk <b className="text-amber-400">{(s.risk_pct ?? 0.5).toFixed(1)}%</b></>
+      </div>
+
+      <div className="text-sm text-gray-300">
+        Live <b className="text-white">${formatPrice(livePrice)}</b>
+        {priceDeltaFormatted && (
+          <>
+            {' '}
+            <span className={priceDelta >= 0 ? 'text-green-400' : 'text-red-400'}>
+              ({priceDeltaFormatted} vs entry)
+            </span>
+          </>
+        )}
+        {priceLastUpdated && (
+          <span className="text-xs text-gray-500 ml-2">
+            Updated {priceLastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        )}
       </div>
       
       <div className="flex flex-wrap gap-2 text-xs">

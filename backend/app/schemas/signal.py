@@ -28,6 +28,9 @@ class SignalBase(BaseModel):
     risk_pct: Union[float, None] = 0.5
     is_active: bool = True
     expires_at: Union[datetime, None] = None
+    current_price: Union[float, None] = None
+    price_change_percent: Union[float, None] = None
+    price_last_updated: Union[datetime, None] = None
 
 
 class SignalRead(SignalBase):

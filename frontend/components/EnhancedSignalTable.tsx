@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Signal, takeSignal, TakeSignalData } from '@/lib/api';
 import EnhancedSignalCard from '@/components/EnhancedSignalCard';
 import LiveTrading from '@/components/LiveTrading';
@@ -17,14 +17,17 @@ interface TakeSignalModalProps {
   loading: boolean;
 }
 
-const TakeSignalModal: React.FC<TakeSignalModalProps> = ({ 
-  signal, 
-  isOpen, 
-  onClose, 
-  onSubmit, 
-  loading 
+const TakeSignalModal: React.FC<TakeSignalModalProps> = ({
+  signal,
+  isOpen,
+  onClose,
+  onSubmit,
+  loading
 }) => {
-  const [entryPrice, setEntryPrice] = useState(signal.entry_price.toString());
+  const [entryPrice, setEntryPrice] = useState(() => {
+    const price = signal.current_price ?? signal.entry_price;
+    return price.toString();
+  });
   const [quantity, setQuantity] = useState('');
   const [notes, setNotes] = useState('');
 
@@ -37,6 +40,25 @@ const TakeSignalModal: React.FC<TakeSignalModalProps> = ({
       notes: notes || undefined,
     });
   };
+
+  useEffect(() => {
+    const price = signal.current_price ?? signal.entry_price;
+    setEntryPrice(price.toString());
+  }, [signal]);
+
+  const formatPrice = (price: number) => {
+    if (price >= 10) return price.toFixed(2);
+    if (price >= 1) return price.toFixed(4);
+    return price.toFixed(6);
+  };
+
+  const deltaFromEntry = signal.current_price
+    ? ((signal.current_price - signal.entry_price) / signal.entry_price) * 100
+    : null;
+  const deltaLabel = deltaFromEntry !== null
+    ? `${deltaFromEntry >= 0 ? '+' : ''}${deltaFromEntry.toFixed(2)}%`
+    : null;
+  const deltaPositive = deltaFromEntry !== null && deltaFromEntry >= 0;
 
   if (!isOpen) return null;
 
@@ -68,11 +90,26 @@ const TakeSignalModal: React.FC<TakeSignalModalProps> = ({
           backgroundColor: '#f9fafb',
           borderRadius: '0.375rem'
         }}>
-          <div style={{ fontSize: '0.875rem', color: '#4b5563', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-            <div><strong>Direction:</strong> {signal.direction}</div>
-            <div><strong>Suggested Entry:</strong> ${signal.entry_price.toFixed(4)}</div>
-            <div><strong>Target:</strong> ${signal.target_price.toFixed(4)}</div>
-            <div><strong>Stop Loss:</strong> ${signal.stop_loss.toFixed(4)}</div>
+            <div style={{ fontSize: '0.875rem', color: '#4b5563', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+              <div><strong>Direction:</strong> {signal.direction}</div>
+            <div><strong>Suggested Entry:</strong> ${formatPrice(signal.entry_price)}</div>
+            {signal.current_price && (
+              <div>
+                <strong>Live Price:</strong> ${formatPrice(signal.current_price)}
+                {' '}
+                {deltaLabel && (
+                  <span
+                    style={{
+                      color: deltaPositive ? '#16a34a' : '#dc2626'
+                    }}
+                  >
+                    ({`${deltaLabel} vs entry`})
+                  </span>
+                )}
+              </div>
+            )}
+            <div><strong>Target:</strong> ${formatPrice(signal.target_price)}</div>
+            <div><strong>Stop Loss:</strong> ${formatPrice(signal.stop_loss)}</div>
           </div>
         </div>
 
@@ -172,15 +209,21 @@ const TakeSignalModal: React.FC<TakeSignalModalProps> = ({
   );
 };
 
-export const EnhancedSignalTable: React.FC<EnhancedSignalTableProps> = ({ 
-  signals, 
+export const EnhancedSignalTable: React.FC<EnhancedSignalTableProps> = ({
+  signals,
   onSignalTaken,
-  showLiveTrading = false 
+  showLiveTrading = false
 }) => {
   const [selectedSignal, setSelectedSignal] = useState<Signal | null>(null);
   const [expandedSignal, setExpandedSignal] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const formatPrice = (price: number) => {
+    if (price >= 10) return price.toFixed(2);
+    if (price >= 1) return price.toFixed(4);
+    return price.toFixed(6);
+  };
 
   const handleTakeSignal = (signal: Signal) => {
     setSelectedSignal(signal);
@@ -276,6 +319,7 @@ export const EnhancedSignalTable: React.FC<EnhancedSignalTableProps> = ({
               <th>Pair</th>
               <th>Direction</th>
               <th>Entry</th>
+              <th>Live</th>
               <th>Target</th>
               <th>Stop Loss</th>
               <th>Quality</th>
@@ -285,8 +329,13 @@ export const EnhancedSignalTable: React.FC<EnhancedSignalTableProps> = ({
             </tr>
           </thead>
           <tbody>
-            {signals.map((signal) => (
-              <tr key={signal.id}>
+            {signals.map((signal) => {
+              const priceDelta = signal.current_price
+                ? ((signal.current_price - signal.entry_price) / signal.entry_price) * 100
+                : null;
+
+              return (
+                <tr key={signal.id}>
                 <td style={{ fontWeight: 500 }}>{signal.symbol}</td>
                 <td style={{
                   fontWeight: 500,
@@ -294,9 +343,24 @@ export const EnhancedSignalTable: React.FC<EnhancedSignalTableProps> = ({
                 }}>
                   {signal.direction}
                 </td>
-                <td>${signal.entry_price.toFixed(signal.entry_price < 10 ? 6 : 2)}</td>
-                <td>${signal.target_price.toFixed(signal.target_price < 10 ? 6 : 2)}</td>
-                <td>${signal.stop_loss.toFixed(signal.stop_loss < 10 ? 6 : 2)}</td>
+                <td>${formatPrice(signal.entry_price)}</td>
+                <td>
+                  {signal.current_price ? (
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span>${formatPrice(signal.current_price)}</span>
+                      {priceDelta !== null && (
+                        <span style={{
+                          fontSize: '0.75rem',
+                          color: priceDelta >= 0 ? '#16a34a' : '#dc2626'
+                        }}>
+                          {`${priceDelta >= 0 ? '+' : ''}${priceDelta.toFixed(2)}%`}
+                        </span>
+                      )}
+                    </div>
+                  ) : '—'}
+                </td>
+                <td>${formatPrice(signal.target_price)}</td>
+                <td>${formatPrice(signal.stop_loss)}</td>
                 <td>
                   <span style={{
                     display: 'inline-block',
@@ -338,7 +402,8 @@ export const EnhancedSignalTable: React.FC<EnhancedSignalTableProps> = ({
                   </button>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
