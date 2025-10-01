@@ -22,6 +22,17 @@ export const LiveTrading = ({ signal, onTradePlaced }: LiveTradingProps) => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  const formatPrice = (price: number) => {
+    if (price >= 10) return price.toFixed(2);
+    if (price >= 1) return price.toFixed(4);
+    return price.toFixed(6);
+  };
+
+  const livePrice = signal.current_price ?? signal.entry_price;
+  const priceDelta = signal.current_price
+    ? ((signal.current_price - signal.entry_price) / signal.entry_price) * 100
+    : null;
+
   useEffect(() => {
     loadConnections();
   }, []);
@@ -137,7 +148,22 @@ export const LiveTrading = ({ signal, onTradePlaced }: LiveTradingProps) => {
               <div>
                 <span style={{ color: '#94a3b8' }}>Entry:</span>
                 <div style={{ color: '#f8fafc', fontWeight: 'bold' }}>
-                  ${signal.entry_price.toFixed(6)}
+                  ${formatPrice(signal.entry_price)}
+                </div>
+              </div>
+              <div>
+                <span style={{ color: '#94a3b8' }}>Live:</span>
+                <div style={{ color: '#f8fafc', fontWeight: 'bold' }}>
+                  ${formatPrice(livePrice)}
+                  {priceDelta !== null && (
+                    <span style={{
+                      color: priceDelta >= 0 ? '#22c55e' : '#f87171',
+                      fontSize: '0.75rem',
+                      marginLeft: '0.25rem'
+                    }}>
+                      ({`${priceDelta >= 0 ? '+' : ''}${priceDelta.toFixed(2)}%`})
+                    </span>
+                  )}
                 </div>
               </div>
               <div>
