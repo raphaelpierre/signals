@@ -5,12 +5,15 @@ from functools import lru_cache
 from typing import Dict, Iterable, List, Optional, Sequence
 
 import ccxt
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException, Request
 from sqlalchemy import desc, func, or_
 from sqlalchemy.orm import Session
 
 from app.api.deps import ensure_active_subscription, get_current_user
 from app.core.config import settings
+from app.core.cache import get_cache, invalidate_signals_cache
+from app.core.exceptions import ExchangeAPIError, RateLimitError
+from app.core.rate_limit import rate_limit_by_ip, rate_limit_by_user
 from app.db.session import get_db
 from app.models.signal import Signal
 from app.models.user import User
@@ -34,38 +37,79 @@ def _exchange() -> ccxt.Exchange:
     return exchange
 
 
-def _fetch_live_market_data(symbols: Iterable[str]) -> Dict[str, Dict[str, Optional[float]]]:
+def _fetch_live_market_data(symbols: Iterable[str], retry_count: int = 2, use_cache: bool = True) -> Dict[str, Dict[str, Optional[float]]]:
     unique_symbols = sorted({symbol for symbol in symbols if symbol})
     if not unique_symbols:
         return {}
 
-    exchange = _exchange()
+    # Check cache first
+    cache = get_cache()
+    cache_key = f"market_data:bulk:{','.join(unique_symbols)}"
 
-    try:
-        tickers = exchange.fetch_tickers(unique_symbols)
-    except Exception as exc:  # pragma: no cover - external API failures
-        logger.warning("Bulk ticker fetch failed: %s", exc)
-        tickers = {}
+    if use_cache:
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            logger.debug("Cache hit for market data: %d symbols", len(unique_symbols))
+            return cached_data
+
+    exchange = _exchange()
+    tickers = {}
+
+    for attempt in range(retry_count):
+        try:
+            tickers = exchange.fetch_tickers(unique_symbols)
+            break
+        except ccxt.RateLimitExceeded as exc:
+            logger.warning("Rate limit on bulk ticker fetch, attempt %d/%d", attempt + 1, retry_count)
+            if attempt < retry_count - 1:
+                import time
+                time.sleep(2 ** attempt)
+            else:
+                logger.error("Rate limit exceeded after %d attempts", retry_count)
+        except ccxt.NetworkError as exc:
+            logger.warning("Network error on bulk ticker fetch: %s, attempt %d/%d", exc, attempt + 1, retry_count)
+            if attempt < retry_count - 1:
+                import time
+                time.sleep(1)
+        except Exception as exc:
+            logger.warning("Bulk ticker fetch failed: %s", exc)
+            break
 
     market_data: Dict[str, Dict[str, Optional[float]]] = {}
 
     for symbol in unique_symbols:
         ticker = tickers.get(symbol)
         if ticker is None:
-            try:
-                ticker = exchange.fetch_ticker(symbol)
-            except Exception as exc:  # pragma: no cover - external API failures
-                logger.warning("Failed to fetch ticker for %s: %s", symbol, exc)
-                continue
+            # Fallback to individual ticker fetch with retry
+            for attempt in range(retry_count):
+                try:
+                    ticker = exchange.fetch_ticker(symbol)
+                    break
+                except ccxt.RateLimitExceeded:
+                    if attempt < retry_count - 1:
+                        import time
+                        time.sleep(1)
+                    else:
+                        logger.warning("Rate limit fetching ticker for %s", symbol)
+                        continue
+                except (ccxt.NetworkError, ccxt.ExchangeError) as exc:
+                    logger.warning("Failed to fetch ticker for %s: %s", symbol, exc)
+                    break
+                except Exception as exc:
+                    logger.error("Unexpected error fetching ticker for %s: %s", symbol, exc)
+                    break
 
-        last_price = ticker.get("last") or ticker.get("close")
-        if last_price is None:
-            continue
+        if ticker:
+            last_price = ticker.get("last") or ticker.get("close")
+            if last_price is not None:
+                market_data[symbol] = {
+                    "price": float(last_price),
+                    "percentage": float(ticker.get("percentage")) if ticker.get("percentage") is not None else None,
+                }
 
-        market_data[symbol] = {
-            "price": float(last_price),
-            "percentage": float(ticker.get("percentage")) if ticker.get("percentage") is not None else None,
-        }
+    # Cache the result for 30 seconds (market data changes frequently)
+    if market_data and use_cache:
+        cache.set(cache_key, market_data, ttl=30)
 
     return market_data
 
@@ -111,11 +155,13 @@ def _deactivate_expired_signals(db: Session) -> None:
 
 
 @router.get("/historic", response_model=List[SignalRead])
-def get_historic_signals(
+async def get_historic_signals(
+    request: Request,
     days: int = Query(default=30, le=90, description="Number of days of history to show"),
     limit: int = Query(default=50, le=200, description="Maximum number of signals to return"),
     symbol: str = Query(default=None, description="Filter by specific trading pair"),
     db: Session = Depends(get_db),
+    rate_limit_info: dict = Depends(lambda r: rate_limit_by_ip(r, limit=100, window=60)),
 ) -> List[Signal]:
     """
     Public endpoint for historic signals - no authentication required.
@@ -137,8 +183,10 @@ def get_historic_signals(
 
 
 @router.get("/demo", response_model=List[SignalRead])
-def get_demo_signals(
+async def get_demo_signals(
+    request: Request,
     db: Session = Depends(get_db),
+    rate_limit_info: dict = Depends(lambda r: rate_limit_by_ip(r, limit=100, window=60)),
 ) -> List[Signal]:
     """
     Public endpoint for demo signals - shows a curated selection of high-quality historic signals.
@@ -265,24 +313,39 @@ def get_latest_signals(
 ) -> List[Signal]:
     ensure_active_subscription(current_user)
 
+    # Build cache key based on query parameters
+    cache_key = f"signals:latest:{limit}:{symbol or 'all'}:{direction or 'all'}:{min_confidence or 'none'}"
+    cache = get_cache()
+
+    # Check cache (short TTL since signals are time-sensitive)
+    cached = cache.get(cache_key)
+    if cached:
+        logger.debug("Cache hit for latest signals")
+        return cached
+
     _deactivate_expired_signals(db)
 
     now = datetime.utcnow()
 
     query = db.query(Signal).filter(Signal.is_active == True)
     query = query.filter(or_(Signal.expires_at.is_(None), Signal.expires_at > now))
-    
+
     if symbol:
         query = query.filter(Signal.symbol == symbol.upper())
-    
+
     if direction:
         query = query.filter(Signal.direction == direction.upper())
-    
+
     if min_confidence is not None:
         query = query.filter(Signal.confidence >= min_confidence)
-    
+
     signals = query.order_by(Signal.created_at.desc()).limit(limit).all()
-    return _attach_live_market_data(signals)
+    result = _attach_live_market_data(signals)
+
+    # Cache for 60 seconds
+    cache.set(cache_key, result, ttl=60)
+
+    return result
 
 
 @router.get("/watchlist", response_model=List[SignalRead])
@@ -405,8 +468,15 @@ def get_high_confidence_signals(
 
 
 @router.post("/refresh")
-def refresh_signals(current_user: User = Depends(get_current_user)) -> dict:
+async def refresh_signals(
+    current_user: User = Depends(get_current_user),
+    rate_limit_info: dict = Depends(lambda: None)
+) -> dict:
     ensure_active_subscription(current_user)
+
+    # Apply stricter rate limit for expensive signal refresh operation
+    await rate_limit_by_user(current_user.id, "refresh", limit=5, window=300)  # 5 per 5 minutes
+
     job_id = enqueue_signal_job()
     return {
         "job_id": job_id,

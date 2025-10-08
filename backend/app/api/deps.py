@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
@@ -45,3 +45,21 @@ def ensure_active_subscription(user: User) -> None:
     subscription = user.subscription
     if subscription is None or subscription.status not in {"active", "trialing"}:
         raise HTTPException(status_code=402, detail="Active subscription required")
+
+
+async def get_current_user_ws(token: str, db: Session) -> Optional[User]:
+    """Get current user for WebSocket connections."""
+    try:
+        payload = jwt.decode(
+            token,
+            settings.jwt_secret_key,
+            algorithms=[settings.jwt_algorithm]
+        )
+        token_data = TokenPayload(**payload)
+        if token_data.sub is None:
+            return None
+
+        user = db.query(User).filter(User.id == int(token_data.sub)).first()
+        return user
+    except JWTError:
+        return None

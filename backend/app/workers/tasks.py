@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import numpy as np
+import time
 from datetime import datetime, timedelta
 from typing import Dict, List, Tuple, Optional
 
@@ -12,6 +13,7 @@ from rq import Queue
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.exceptions import ExchangeAPIError, InsufficientDataError, RateLimitError
 from app.db.session import SessionLocal
 from app.models.signal import Signal
 
@@ -256,17 +258,48 @@ def determine_regime(
     }
 
 
-def generate_signal_for_pair(db: Session, symbol: str) -> Optional[Signal]:
+def generate_signal_for_pair(db: Session, symbol: str, retry_count: int = 3) -> Optional[Signal]:
     exchange = _exchange()
-    try:
-        # Fetch more historical data for better analysis
-        ohlcv = exchange.fetch_ohlcv(symbol, timeframe="1h", limit=100)
-        if not ohlcv or len(ohlcv) < 50:
-            logger.warning("Insufficient data for %s", symbol)
+    ohlcv = None
+
+    for attempt in range(retry_count):
+        try:
+            # Fetch more historical data for better analysis
+            ohlcv = exchange.fetch_ohlcv(symbol, timeframe="1h", limit=100)
+            if not ohlcv or len(ohlcv) < 50:
+                raise InsufficientDataError(symbol, 50, len(ohlcv) if ohlcv else 0)
+            break
+
+        except ccxt.RateLimitExceeded as exc:
+            retry_after = getattr(exc, 'retry_after', 60)
+            logger.warning("Rate limit for %s on attempt %d/%d, waiting %ds",
+                         symbol, attempt + 1, retry_count, retry_after)
+            if attempt < retry_count - 1:
+                time.sleep(retry_after)
+            else:
+                raise RateLimitError(settings.ccxt_exchange, retry_after)
+
+        except ccxt.NetworkError as exc:
+            logger.warning("Network error for %s on attempt %d/%d: %s",
+                         symbol, attempt + 1, retry_count, exc)
+            if attempt < retry_count - 1:
+                time.sleep(2 ** attempt)  # Exponential backoff
+            else:
+                raise ExchangeAPIError(settings.ccxt_exchange, symbol, f"Network error after {retry_count} attempts: {exc}")
+
+        except ccxt.ExchangeError as exc:
+            logger.error("Exchange error for %s: %s", symbol, exc)
+            raise ExchangeAPIError(settings.ccxt_exchange, symbol, str(exc))
+
+        except InsufficientDataError as exc:
+            logger.warning(str(exc))
             return None
-            
-    except Exception as exc:  # pragma: no cover - network failure fallback
-        logger.exception("Failed to fetch data for %s: %s", symbol, exc)
+
+        except Exception as exc:
+            logger.exception("Unexpected error fetching data for %s: %s", symbol, exc)
+            raise ExchangeAPIError(settings.ccxt_exchange, symbol, f"Unexpected error: {exc}")
+
+    if not ohlcv:
         return None
     
     # Extract price and volume data
@@ -398,8 +431,18 @@ def generate_signal_for_pair(db: Session, symbol: str) -> Optional[Signal]:
     try:
         db.add(signal)
         db.commit()
-        logger.info("Generated %s signal for %s - Confidence: %.1f%%, RR: %.2f", 
+        db.refresh(signal)
+        logger.info("Generated %s signal for %s - Confidence: %.1f%%, RR: %.2f",
                    direction, symbol, confidence, risk_reward_ratio)
+
+        # Notify WebSocket clients asynchronously
+        try:
+            import asyncio
+            from app.api.v1.websocket import notify_new_signal
+            asyncio.create_task(notify_new_signal(signal))
+        except Exception as ws_error:
+            logger.warning("Failed to notify WebSocket clients: %s", ws_error)
+
         return signal
     except Exception as e:
         logger.error("Failed to save signal for %s: %s", symbol, e)
@@ -410,7 +453,7 @@ def generate_signal_for_pair(db: Session, symbol: str) -> Optional[Signal]:
 def generate_signals() -> Dict[str, int]:
     db = SessionLocal()
     results = {"generated": 0, "skipped": 0, "errors": 0}
-    
+
     try:
         for symbol in settings.ccxt_trading_pairs:
             try:
@@ -424,7 +467,16 @@ def generate_signals() -> Dict[str, int]:
                 results["errors"] += 1
     finally:
         db.close()
-    
+
+    # Invalidate caches if any signals were generated
+    if results["generated"] > 0:
+        try:
+            from app.core.cache import invalidate_signals_cache
+            invalidate_signals_cache()
+            logger.info("Invalidated signal caches after generating %d signals", results["generated"])
+        except Exception as e:
+            logger.error("Failed to invalidate caches: %s", e)
+
     logger.info("Signal generation completed: %s", results)
     return results
 
