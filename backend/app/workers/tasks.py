@@ -16,6 +16,7 @@ from app.core.config import settings
 from app.core.exceptions import ExchangeAPIError, InsufficientDataError, RateLimitError
 from app.db.session import SessionLocal
 from app.models.signal import Signal
+from app.services.ai_model_service import get_ai_model_service
 
 logger = logging.getLogger(__name__)
 
@@ -316,77 +317,70 @@ def generate_signal_for_pair(db: Session, symbol: str, retry_count: int = 3) -> 
     # Calculate technical indicators
     rsi = calculate_rsi(closes)
     bb_lower, bb_middle, bb_upper = calculate_bollinger_bands(closes)
-    macd_line, macd_signal, macd_histogram = calculate_macd(closes)
+    macd_line, macd_signal_line, macd_histogram = calculate_macd(closes)
     volume_score = analyze_volume_pattern(volumes)
     market_conditions = determine_market_conditions(closes, rsi, macd_histogram)
-    
-    # Determine signal direction using enhanced logic
+
+    # Calculate Bollinger Band position
     bb_position = (current_price - bb_lower) / (bb_upper - bb_lower) if bb_upper != bb_lower else 0.5
-    
-    direction = None
-    entry_price = current_price
-    
-    # Enhanced signal generation logic
-    if rsi < 35 and bb_position < 0.3 and macd_histogram > 0:  # Strong buy signal
-        direction = "LONG"
-    elif rsi > 65 and bb_position > 0.7 and macd_histogram < 0:  # Strong sell signal
-        direction = "SHORT"
-    elif rsi < 45 and bb_position < 0.4 and volume_score > 50:  # Moderate buy signal
-        direction = "LONG"
-    elif rsi > 55 and bb_position > 0.6 and volume_score > 50:  # Moderate sell signal
-        direction = "SHORT"
-    
-    if not direction:
-        logger.info("No clear signal for %s at this time", symbol)
+
+    # Prepare technical indicators for AI model
+    technical_indicators_dict = {
+        "rsi": rsi,
+        "macd_line": macd_line,
+        "macd_signal": macd_signal_line,
+        "macd_histogram": macd_histogram,
+        "bb_lower": bb_lower,
+        "bb_middle": bb_middle,
+        "bb_upper": bb_upper,
+        "bb_position": bb_position,
+        "volume_score": volume_score
+    }
+
+    # Get AI model prediction
+    ai_service = get_ai_model_service()
+    ai_prediction = ai_service.predict_signal(
+        symbol=symbol,
+        closes=closes,
+        highs=highs,
+        lows=lows,
+        volumes=volumes,
+        technical_indicators=technical_indicators_dict
+    )
+
+    if not ai_prediction:
+        logger.info("No AI signal generated for %s at this time", symbol)
         return None
-    
-    # Calculate targets and stop loss with better risk management
-    atr = np.mean([highs[i] - lows[i] for i in range(-20, 0)])  # Average True Range for volatility
-    
-    if direction == "LONG":
-        target_price = entry_price * 1.015  # 1.5% target
-        stop_loss = entry_price * (1 - (atr / entry_price) * 1.5)  # ATR-based stop loss
-    else:
-        target_price = entry_price * 0.985  # 1.5% target
-        stop_loss = entry_price * (1 + (atr / entry_price) * 1.5)  # ATR-based stop loss
-    
-    # Calculate risk-reward ratio
-    risk = abs(entry_price - stop_loss)
-    reward = abs(target_price - entry_price)
-    risk_reward_ratio = reward / risk if risk > 0 else 0
-    
-    # Calculate confidence score
-    confidence = calculate_confidence_score(rsi, bb_position, volume_score, macd_histogram, direction)
-    
-    # Skip signals with poor risk-reward ratio or low confidence
-    if risk_reward_ratio < 1.2 or confidence < 60:
-        logger.info("Signal for %s rejected - RR: %.2f, Confidence: %.1f", symbol, risk_reward_ratio, confidence)
-        return None
-    
+
+    # Extract AI predictions
+    direction = ai_prediction["direction"]
+    confidence = ai_prediction["confidence"]
+    entry_price = ai_prediction["entry_price"]
+    target_price = ai_prediction["target_price"]
+    stop_loss = ai_prediction["stop_loss"]
+    risk_reward_ratio = ai_prediction["risk_reward_ratio"]
+    ai_reasoning = ai_prediction["reasoning"]
+    model_scores = ai_prediction["model_scores"]
+    model_version = ai_prediction.get("model_version", "v1.0.0")
+
     # Calculate quality score based on multiple factors
     quality_score = min(100, max(0, confidence * 0.7 + (risk_reward_ratio * 10) * 0.3))
     if risk_reward_ratio > 2:
         quality_score += 5
-        
-    # Prepare technical indicators data
+
+    # Prepare technical indicators data for storage
     technical_indicators = {
         "rsi": round(rsi, 2),
         "bollinger_position": round(bb_position * 100, 1),
         "macd_histogram": round(macd_histogram, 4),
         "volume_score": round(volume_score, 1),
-        "atr": round(atr, 4)
+        "atr": round(np.mean([highs[i] - lows[i] for i in range(-20, 0)]), 4),
+        "ai_model_scores": model_scores
     }
-    
-    # Generate human-readable rationale
-    rationale = generate_signal_rationale(
-        rsi,
-        bb_position,
-        macd_histogram,
-        volume_score,
-        direction,
-        market_conditions
-    )
-    
+
+    # Use AI reasoning as rationale
+    rationale = ai_reasoning
+
     # Determine market regime
     regime = determine_regime(
         closes,
@@ -394,11 +388,11 @@ def generate_signal_for_pair(db: Session, symbol: str, retry_count: int = 3) -> 
         rsi,
         market_conditions
     )
-    
+
     # Mock backtest metrics based on the strategy (in production, these would come from actual backtest results)
     bt_winrate = 0.55 + (confidence / 1000)  # 55-65% range
     bt_pf = 1.5 + (risk_reward_ratio / 10)   # 1.5-2.5 range
-    
+
     # Simulate latency in signal generation
     latency_ms = int(np.random.randint(50, 200))
     
@@ -409,8 +403,8 @@ def generate_signal_for_pair(db: Session, symbol: str, retry_count: int = 3) -> 
         entry_price=entry_price,
         target_price=target_price,
         stop_loss=stop_loss,
-        strategy="enhanced-mean-reversion",
-        strategy_id="emr-v1",  # Strategy identifier for methodology page
+        strategy="ai-ensemble",
+        strategy_id=f"ai-ensemble-{model_version}",  # Strategy identifier for methodology page
         confidence=confidence,
         quality_score=quality_score,
         risk_reward_ratio=risk_reward_ratio,
@@ -435,13 +429,12 @@ def generate_signal_for_pair(db: Session, symbol: str, retry_count: int = 3) -> 
         logger.info("Generated %s signal for %s - Confidence: %.1f%%, RR: %.2f",
                    direction, symbol, confidence, risk_reward_ratio)
 
-        # Notify WebSocket clients asynchronously
+        # Notify WebSocket clients asynchronously via Redis pub/sub
         try:
-            import asyncio
-            from app.api.v1.websocket import notify_new_signal
-            asyncio.create_task(notify_new_signal(signal))
+            from app.core.notifications import notify_new_signal_sync
+            notify_new_signal_sync(signal)
         except Exception as ws_error:
-            logger.warning("Failed to notify WebSocket clients: %s", ws_error)
+            logger.warning("Failed to queue signal notification: %s", ws_error)
 
         return signal
     except Exception as e:
