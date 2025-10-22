@@ -15,6 +15,12 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     stripe_customer_id = Column(String, nullable=True)
     default_payment_method = Column(String, nullable=True)
+
+    # Notification preferences
+    email_notifications_enabled = Column(Boolean, default=True, nullable=False)
+    websocket_notifications_enabled = Column(Boolean, default=True, nullable=False)
+    min_signal_confidence = Column(Integer, default=70, nullable=False)  # Only notify for signals >= this confidence
+
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
